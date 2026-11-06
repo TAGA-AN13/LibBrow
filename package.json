@@ -1,0 +1,32 @@
+{
+  "name": "libbrow",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "dev:customer": "npm --prefix frontend run dev:customer",
+    "dev:admin": "npm --prefix frontend run dev:admin",
+    "start": "node src/server.js",
+    "db:generate": "prisma generate",
+    "db:pull": "prisma db pull",
+    "db:format": "prisma format",
+    "test:integration": "vitest run --config vitest.integration.config.js"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.0",
+    "supertest": "^7.1.4",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/libbrow-client-ratings"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId             BigInt         @id @default(autoincrement()) @map("user_id")
+  name               String         @db.Text
+  email              String         @unique @db.Text
+  passwordHash       String         @map("password_hash") @db.Text
+  role               String         @db.Text
+  borrowRequests     BorrowRequest[] @relation("BorrowerRequests")
+  statusChanges      BorrowRequest[] @relation("RequestStatusChangedBy")
+
+  @@map("users")
+}
+
+model Borrower {
+  borrowerId BigInt    @id @default(autoincrement()) @map("borrower_id")
+  name       String    @db.Text
+  email      String    @db.Text
+  address    String    @db.Text
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  requests   BorrowRequest[]
+  loans      Loan[]
+
+  @@map("borrowers")
+}
+
+model Book {
+  bookId          BigInt          @id @default(autoincrement()) @map("book_id")
+  isbn            String          @unique @db.VarChar(13)
+  title           String          @db.Text
+  author          String          @db.Text
+  imageUrl        String?         @map("image_url") @db.Text
+  categories      String[]        @default([])
+  totalCopies     Int             @map("total_copies")
+  availableCopies Int             @map("available_copies")
+  borrowRequests  BorrowRequest[]
+  loans           Loan[]
+
+  @@map("books")
+}
+
+model BorrowRequest {
+  requestId         BigInt    @id @default(autoincrement()) @map("request_id")
+  borrowerId        BigInt?   @map("borrower_id")
+  borrowerRecordId  BigInt?   @map("borrower_record_id")
+  bookId            BigInt    @map("book_id")
+  publicReference   String?   @unique @map("public_reference") @db.VarChar(48)
+  customerName      String?   @map("customer_name") @db.Text
+  customerEmail     String?   @map("customer_email") @db.Text
+  customerAddress   String?   @map("customer_address") @db.Text
+  requestedLoanDays Int?     @map("requested_loan_days")
+  returnNoticeDate  DateTime? @map("return_notice_date") @db.Timestamptz(6)
+  bookRating        Int?      @map("book_rating")
+  requestDate       DateTime  @default(now()) @map("request_date") @db.Timestamptz(6)
+  status            String    @default("Pending") @db.Text
+  statusChangedBy   BigInt?   @map("status_changed_by")
+  actualBorrowDate  DateTime? @map("actual_borrow_date") @db.Date
+  dueDate           DateTime? @map("due_date") @db.Date
+  returnDate        DateTime? @map("return_date") @db.Date
+  borrower          User?     @relation("BorrowerRequests", fields: [borrowerId], references: [userId], onDelete: Restrict)
+  borrowerRecord    Borrower? @relation(fields: [borrowerRecordId], references: [borrowerId], onDelete: Restrict)
+  book              Book      @relation(fields: [bookId], references: [bookId], onDelete: Restrict)
+  statusChangedByUser User?    @relation("RequestStatusChangedBy", fields: [statusChangedBy], references: [userId], onDelete: Restrict)
+  loan              Loan?
+
+  @@map("borrow_requests")
+}
+
+model Loan {
+  loanId           BigInt    @id @default(autoincrement()) @map("loan_id")
+  requestId        BigInt    @unique @map("request_id")
+  borrowerId       BigInt    @map("borrower_id")
+  bookId           BigInt    @map("book_id")
+  actualBorrowDate DateTime  @map("actual_borrow_date") @db.Date
+  dueDate          DateTime  @map("due_date") @db.Date
+  returnDate       DateTime? @map("return_date") @db.Date
+  request          BorrowRequest @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+  borrower         Borrower  @relation(fields: [borrowerId], references: [borrowerId], onDelete: Restrict)
+  book             Book      @relation(fields: [bookId], references: [bookId], onDelete: Restrict)
+
+  @@map("loans")
+}
