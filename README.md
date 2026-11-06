@@ -1,4 +1,5 @@
 # LibBrow
+### A book borrowing system
 
 LibBrow has two separate local websites backed by one Express API and a
 Supabase PostgreSQL database:
