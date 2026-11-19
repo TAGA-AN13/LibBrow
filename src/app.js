@@ -4,6 +4,7 @@ import { apiRouter } from './routes/api.js';
 import { ServiceError } from './services/borrow-request-service.js';
 
 export const app = express();
+export default app;
 
 app.use(express.json({ limit: '4mb' }));
 const allowedOrigins = [
