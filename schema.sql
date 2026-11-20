@@ -10,12 +10,16 @@ CREATE TABLE users (
 );
 
 -- Staff are authenticated by Supabase Auth and mapped to Admin users here.
--- Borrower records are created only after a public request is approved.
+-- Borrower records are managed by the library administrator.
 CREATE TABLE borrowers (
     borrower_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    member_id   TEXT UNIQUE,
+    contact_number TEXT,
+    society_role TEXT CHECK (society_role IS NULL OR society_role IN ('Student', 'Teacher / Faculty', 'School Staff', 'Parent / Guardian', 'Alumni', 'Community Member', 'Other')),
+    status       TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive', 'Suspended')),
     name         TEXT NOT NULL CHECK (length(trim(name)) > 0),
     email        TEXT NOT NULL CHECK (length(trim(email)) > 0),
-    address      TEXT NOT NULL CHECK (length(trim(address)) > 0),
+    address      TEXT,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -29,6 +33,7 @@ CREATE TABLE books (
     categories       TEXT[] NOT NULL DEFAULT '{}',
     total_copies     INTEGER NOT NULL CHECK (total_copies >= 0),
     available_copies INTEGER NOT NULL,
+    is_archived      BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT books_available_copies_valid
         CHECK (available_copies >= 0 AND available_copies <= total_copies)
 );

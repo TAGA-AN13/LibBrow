@@ -16,18 +16,24 @@ model User {
   role               String         @db.Text
   borrowRequests     BorrowRequest[] @relation("BorrowerRequests")
   statusChanges      BorrowRequest[] @relation("RequestStatusChangedBy")
+  auditEvents        AuditEvent[] @relation("AdminAudit")
 
   @@map("users")
 }
 
 model Borrower {
-  borrowerId BigInt    @id @default(autoincrement()) @map("borrower_id")
-  name       String    @db.Text
-  email      String    @db.Text
-  address    String    @db.Text
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  borrowerId    BigInt    @id @default(autoincrement()) @map("borrower_id")
+  memberId      String?   @unique @map("member_id") @db.Text
+  contactNumber String?   @map("contact_number") @db.Text
+  societyRole   String?   @map("society_role") @db.Text
+  status        String    @default("Active") @db.Text
+  name          String    @db.Text
+  email         String    @db.Text
+  address       String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   requests   BorrowRequest[]
   loans      Loan[]
+  auditEvents AuditEvent[]
 
   @@map("borrowers")
 }
@@ -41,8 +47,11 @@ model Book {
   categories      String[]        @default([])
   totalCopies     Int             @map("total_copies")
   availableCopies Int             @map("available_copies")
+  isArchived     Boolean         @default(false) @map("is_archived")
   borrowRequests  BorrowRequest[]
   loans           Loan[]
+  copies          BookCopy[]
+  auditEvents     AuditEvent[]
 
   @@map("books")
 }
@@ -70,6 +79,10 @@ model BorrowRequest {
   book              Book      @relation(fields: [bookId], references: [bookId], onDelete: Restrict)
   statusChangedByUser User?    @relation("RequestStatusChangedBy", fields: [statusChangedBy], references: [userId], onDelete: Restrict)
   loan              Loan?
+  copy              BookCopy?
+  resolution        String?   @db.Text
+  resolutionNote    String?   @map("resolution_note") @db.Text
+  auditEvents       AuditEvent[]
 
   @@map("borrow_requests")
 }
@@ -82,9 +95,44 @@ model Loan {
   actualBorrowDate DateTime  @map("actual_borrow_date") @db.Date
   dueDate          DateTime  @map("due_date") @db.Date
   returnDate       DateTime? @map("return_date") @db.Date
+  resolution       String?   @db.Text
   request          BorrowRequest @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
   borrower         Borrower  @relation(fields: [borrowerId], references: [borrowerId], onDelete: Restrict)
   book             Book      @relation(fields: [bookId], references: [bookId], onDelete: Restrict)
 
   @@map("loans")
+}
+
+model BookCopy {
+  copyId       BigInt   @id @default(autoincrement()) @map("copy_id")
+  bookId       BigInt   @map("book_id")
+  barcode      String   @unique @db.Text
+  status       String   @default("Available") @db.Text
+  requestId    BigInt?  @unique @map("request_id")
+  book         Book     @relation(fields: [bookId], references: [bookId], onDelete: Restrict)
+  request      BorrowRequest? @relation(fields: [requestId], references: [requestId], onDelete: Restrict)
+  @@map("book_copies")
+}
+
+model AuditEvent {
+  auditEventId BigInt   @id @default(autoincrement()) @map("audit_event_id")
+  action       String   @db.Text
+  details      Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  adminId      BigInt?  @map("admin_id")
+  borrowerId   BigInt?  @map("borrower_id")
+  bookId       BigInt?  @map("book_id")
+  requestId    BigInt?  @map("request_id")
+  borrower     Borrower? @relation(fields: [borrowerId], references: [borrowerId], onDelete: SetNull)
+  admin        User? @relation("AdminAudit", fields: [adminId], references: [userId], onDelete: SetNull)
+  book         Book? @relation(fields: [bookId], references: [bookId], onDelete: SetNull)
+  request      BorrowRequest? @relation(fields: [requestId], references: [requestId], onDelete: SetNull)
+  @@map("audit_events")
+}
+
+model LibrarySetting {
+  settingKey String   @id @map("setting_key") @db.Text
+  value      String   @map("setting_value") @db.Text
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@map("library_settings")
 }

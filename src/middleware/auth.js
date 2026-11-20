@@ -17,9 +17,9 @@ export function assertAuthConfig() {
   getJwtSecret();
 }
 
-export function issueAccessToken(user) {
+export function issueAccessToken(user, { authMethod } = {}) {
   return jwt.sign(
-    { role: user.role },
+    { role: user.role, ...(authMethod ? { auth_method: authMethod } : {}) },
     getJwtSecret(),
     {
       algorithm: 'HS256',
@@ -63,71 +63,28 @@ export function authenticateToken(req, res, next) {
   next();
 }
 
-/** Validate a Supabase Auth access token and map the email to an Admin record. */
-async function resolveSupabaseIdentity(req, res) {
+/** Validate the signed, short-lived local administrator session on API routes. */
+export async function authenticateAdmin(req, res, next) {
   const authorization = req.get('authorization');
-  const match = typeof authorization === 'string'
-    ? authorization.match(/^Bearer\s+([^\s]+)$/i)
-    : null;
-  if (!match) {
-    res.status(401).json({ error: 'A Supabase Bearer access token is required' });
-    return null;
-  }
-
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    res.status(503).json({ error: 'Staff authentication is not configured on the API' });
-    return null;
-  }
-
+  const match = typeof authorization === 'string' ? authorization.match(/^Bearer\s+([^\s]+)$/i) : null;
+  if (!match) return res.status(401).json({ error: 'A Bearer access token is required' });
   try {
-    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${match[1]}` },
+    const claims = jwt.verify(match[1], getJwtSecret(), {
+      algorithms: ['HS256'], issuer: JWT_ISSUER, audience: JWT_AUDIENCE,
     });
-    if (!response.ok) {
-      res.status(401).json({ error: 'Supabase session is invalid or expired' });
-      return null;
+    if (claims.auth_method !== 'local_admin' || claims.role !== 'Admin' || !/^[1-9]\d*$/.test(claims.sub ?? '')) {
+      return res.status(401).json({ error: 'Administrator session is invalid' });
     }
-    const authUser = await response.json();
-    if (!authUser?.email) {
-      res.status(401).json({ error: 'Supabase account has no email address' });
-      return null;
-    }
-    return authUser;
-  } catch (error) {
-    throw error;
-  }
-}
-
-export async function authenticateSupabaseUser(req, res, next) {
-  try {
-    const authUser = await resolveSupabaseIdentity(req, res);
-    if (!authUser) return;
-    req.authUser = authUser;
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-export async function authenticateSupabaseStaff(req, res, next) {
-  try {
-    const authUser = await resolveSupabaseIdentity(req, res);
-    if (!authUser) return;
     const user = await prisma.user.findUnique({
-      where: { email: authUser.email.toLowerCase() },
+      where: { userId: BigInt(claims.sub) },
       select: { userId: true, name: true, email: true, role: true },
     });
-    if (!user || user.role !== 'Admin') {
-      res.status(403).json({ error: 'This Supabase account is not an authorized staff member' });
-      return;
-    }
-
-    req.user = { userId: user.userId.toString(), role: 'Admin', name: user.name, email: user.email, authUserId: authUser.id };
+    if (!user || user.role !== 'Admin') return res.status(403).json({ error: 'Administrator access is no longer active' });
+    req.user = { userId: user.userId.toString(), name: user.name, email: user.email, role: 'Admin' };
     next();
   } catch (error) {
-    next(error);
+    if (error.message === 'JWT_SECRET must contain at least 32 bytes') return next(error);
+    return res.status(401).json({ error: 'Administrator session is invalid or expired' });
   }
 }
 
