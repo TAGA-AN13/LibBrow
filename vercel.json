@@ -5,6 +5,7 @@
   "buildCommand": "npm run build && npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index?path=:path*" },
     { "source": "/:path((?!api/).*)", "destination": "/index.html" }
   ]
 }
